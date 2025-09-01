@@ -1,0 +1,88 @@
+# Warehouse Layout Optimization Rules
+# Based on OSHA, NFPA, and industry best practices
+
+forklift_aisles:
+  # Minimum aisle widths by forklift class (feet)
+  WA: 13.0  # Wide-aisle trucks
+  NA: 8.5   # Narrow-aisle trucks  
+  VNA: 5.5  # Very narrow-aisle trucks
+  
+  # Additional clearances
+  load_clearance: 1.0  # feet on each side of load
+  turning_radius_factor: 1.2  # multiply by truck length
+
+fire_safety:
+  # NFPA requirements for sprinkler systems
+  flue_space_transverse: 6.0  # inches between loads
+  flue_space_longitudinal: 3.0  # inches back-to-back
+  max_pile_height: 20.0  # feet without sprinklers
+
+dock_design:
+  # Loading dock specifications
+  min_apron_depth: 35.0  # feet
+  dock_door_width: 9.0   # feet
+  door_spacing: 12.0     # feet center-to-center
+  staging_depth_factor: 2.5  # multiply by peak pallets per door
+
+pedestrian_areas:
+  # OSHA walkway requirements
+  min_walkway_width: 4.0  # feet
+  marked_walkway_width: 3.0  # feet minimum if marked
+  clearance_from_equipment: 2.0  # feet
+
+safety_clearances:
+  # General safety distances
+  equipment_to_wall: 3.0  # feet
+  emergency_egress_width: 44.0  # inches minimum
+  max_travel_distance: 200.0  # feet to exit
+
+rack_storage:
+  # Storage rack specifications
+  aisle_width_factor: 2.0  # multiply by load length
+  upright_clearance: 6.0   # inches from aisle edge
+  beam_to_beam_clearance: 3.0  # inches vertical
+
+automation:
+  # Automated system requirements
+  asrs_maintenance_aisle: 8.0  # feet
+  conveyor_clearance: 3.0      # feet from walls
+  robot_charging_area: 100.0   # square feet per 10 robots
+
+adjacency_weights:
+  # Flow relationships (0.0 to 1.0)
+  inbound_to_depal: 0.9
+  depal_to_storage: 0.8
+  storage_to_picking: 0.7
+  picking_to_consolidation: 0.8
+  consolidation_to_shipping: 0.9
+  charging_to_automation: 0.6
+
+area_coefficients:
+  # Square meters per unit throughput
+  pallet_asrs: 0.8      # m² per pallet/hour
+  tote_asrs: 0.3        # m² per tote/hour  
+  gtp: 0.05             # m² per tote/hour
+  picking: 0.1          # m² per order/hour
+  consolidation: 0.08   # m² per order/hour
+  staging: 1.2          # m² per door × peak pallets
+
+validation_rules:
+  - rule: "aisle_width_compliance"
+    description: "Verify forklift aisle widths meet specifications"
+    severity: "error"
+    
+  - rule: "fire_safety_clearances" 
+    description: "Check flue spaces and sprinkler clearances"
+    severity: "warning"
+    
+  - rule: "dock_capacity"
+    description: "Validate dock door count vs throughput"
+    severity: "info"
+    
+  - rule: "emergency_egress"
+    description: "Ensure adequate emergency exit paths"
+    severity: "error"
+    
+  - rule: "pedestrian_safety"
+    description: "Verify walkway widths and markings"
+    severity: "warning"

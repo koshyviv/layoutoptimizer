@@ -1,0 +1,9 @@
+---
+description: Very important notices
+globs:
+alwaysApply: true
+---
+
+- always use `docker compose` to interact with containers
+- do not directly call the server, or run it
+- the plan is listed in @task.txt
