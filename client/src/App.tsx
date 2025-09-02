@@ -8,7 +8,7 @@ import { useAppStore } from '@/lib/store';
 
 // Main application component with modern three-panel layout inspired by YC companies
 const App: React.FC = () => {
-  const isLoading = useAppStore(state => state.isLoading);
+  const { isLoading, isSidebarCollapsed } = useAppStore();
 
   return (
     <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col overflow-hidden">
@@ -54,12 +54,16 @@ const App: React.FC = () => {
           )}
         </motion.div>
 
-        {/* Insights Panel - Right (24% as per requirements) */}
+        {/* Insights Panel - Right (responsive width) */}
         <motion.div 
           initial={{ x: 300, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
-          className="w-[24%] panel border-l border-border/50 bg-card/95 backdrop-blur-sm"
+          animate={{ 
+            x: 0, 
+            opacity: 1,
+            width: isSidebarCollapsed ? '60px' : '24%'
+          }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="panel overflow-hidden"
         >
           <InsightsPanel />
         </motion.div>

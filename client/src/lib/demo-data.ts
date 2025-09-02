@@ -3,12 +3,25 @@ import { generateId } from './utils';
 
 // Demo data to showcase the UI without backend
 export const createDemoPlan = (): Plan => {
+  return createDemoPlanVariant('A');
+};
+
+export const createDemoPlanVariant = (variant: 'A' | 'B' | 'C'): Plan => {
+  // Base offsets for different variants
+  const variantOffsets = {
+    A: { x: 0, y: 0 },
+    B: { x: 2, y: 1 },
+    C: { x: -1, y: 2 }
+  };
+  
+  const offset = variantOffsets[variant];
+  
   const blocks: Block[] = [
     {
       id: generateId(),
       key: 'inbound',
-      x: 4,
-      y: 6,
+      x: 4 + offset.x,
+      y: 6 + offset.y,
       w: 24,
       h: 12,
       meta: {
@@ -22,8 +35,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'depalletizer',
-      x: 30,
-      y: 8,
+      x: 30 + offset.x,
+      y: 8 + offset.y,
       w: 12,
       h: 8,
       meta: {
@@ -36,8 +49,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'pallet_asrs',
-      x: 4,
-      y: 22,
+      x: 4 + offset.x,
+      y: 22 + offset.y,
       w: 32,
       h: 18,
       meta: {
@@ -52,8 +65,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'tote_asrs',
-      x: 40,
-      y: 22,
+      x: 40 + offset.x,
+      y: 22 + offset.y,
       w: 24,
       h: 12,
       meta: {
@@ -67,8 +80,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'gtp',
-      x: 68,
-      y: 18,
+      x: 68 + offset.x,
+      y: 18 + offset.y,
       w: 18,
       h: 12,
       meta: {
@@ -82,8 +95,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'picking',
-      x: 38,
-      y: 44,
+      x: 38 + offset.x,
+      y: 44 + offset.y,
       w: 26,
       h: 16,
       meta: {
@@ -97,8 +110,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'consolidation',
-      x: 68,
-      y: 44,
+      x: 68 + offset.x,
+      y: 44 + offset.y,
       w: 20,
       h: 14,
       meta: {
@@ -111,8 +124,8 @@ export const createDemoPlan = (): Plan => {
     {
       id: generateId(),
       key: 'palletizer',
-      x: 92,
-      y: 48,
+      x: 92 + offset.x,
+      y: 48 + offset.y,
       w: 12,
       h: 8,
       meta: {
@@ -181,25 +194,63 @@ export const createDemoPlan = (): Plan => {
     }
   ];
 
-  return {
-    id: 'demo-plan-a',
-    blocks,
-    score: 0.847,
-    scores: {
-      travel: 0.82,
-      adj: 0.89,
-      safety: 0.91,
-      compact: 0.78
+  // Variant-specific scores and findings
+  const variantData = {
+    A: {
+      score: 0.847,
+      scores: { travel: 0.82, adj: 0.89, safety: 0.91, compact: 0.78 },
+      findings: [
+        'All OSHA safety clearances met',
+        'Forklift aisle widths comply with WA truck specifications',
+        'Consider 6" flue spaces for optimal fire safety'
+      ]
     },
-    ruleFindings: [
-      'All OSHA safety clearances met',
-      'Forklift aisle widths comply with WA truck specifications',
-      'Consider 6" flue spaces for optimal fire safety'
-    ]
+    B: {
+      score: 0.863,
+      scores: { travel: 0.85, adj: 0.91, safety: 0.89, compact: 0.81 },
+      findings: [
+        'Improved adjacency between GTP and picking areas',
+        'Slightly reduced travel distances',
+        'All safety requirements met'
+      ]
+    },
+    C: {
+      score: 0.829,
+      scores: { travel: 0.79, adj: 0.87, safety: 0.93, compact: 0.75 },
+      findings: [
+        'Enhanced safety clearances',
+        'More compact layout with better space utilization',
+        'Minor increase in travel distances'
+      ]
+    }
+  };
+
+  const data = variantData[variant];
+
+  return {
+    id: `demo-plan-${variant.toLowerCase()}`,
+    blocks,
+    score: data.score,
+    scores: data.scores,
+    ruleFindings: data.findings
   };
 };
 
 export const createDemoOptimizationResult = () => {
+  const plans = [
+    createDemoPlanVariant('A'),
+    createDemoPlanVariant('B'), 
+    createDemoPlanVariant('C')
+  ];
+  
+  return {
+    plans,
+    selectedPlanId: 'demo-plan-a',
+    isOptimizing: false
+  };
+};
+
+export const createDemoOptimizationResultOld = () => {
   const basePlan = createDemoPlan();
   
   return {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   BarChart, 
@@ -28,7 +28,9 @@ import {
   Target,
   Shield,
   Maximize,
-  Route
+  Route,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,7 +45,10 @@ const InsightsPanel: React.FC = () => {
   const { 
     currentPlan, 
     optimizationResult, 
-    validationResult 
+    validationResult,
+    selectPlan,
+    isSidebarCollapsed,
+    setSidebarCollapsed
   } = useAppStore();
 
   // Mock data for demonstration - in real app this comes from the plan
@@ -56,10 +61,10 @@ const InsightsPanel: React.FC = () => {
   } : null;
 
   const radarData = kpiData ? [
-    { subject: 'Travel', A: kpiData.travel * 100, fullMark: 100 },
-    { subject: 'Adjacency', A: kpiData.adjacency * 100, fullMark: 100 },
-    { subject: 'Safety', A: kpiData.safety * 100, fullMark: 100 },
-    { subject: 'Compactness', A: kpiData.compactness * 100, fullMark: 100 },
+    { subject: 'Travel', A: kpiData.travel * 100, fullMark: 100, id: 'travel' },
+    { subject: 'Adjacency', A: kpiData.adjacency * 100, fullMark: 100, id: 'adjacency' },
+    { subject: 'Safety', A: kpiData.safety * 100, fullMark: 100, id: 'safety' },
+    { subject: 'Compactness', A: kpiData.compactness * 100, fullMark: 100, id: 'compactness' },
   ] : [];
 
   const planComparison = optimizationResult?.plans.slice(0, 3).map((plan, index) => ({
@@ -172,19 +177,36 @@ const InsightsPanel: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-card/95 backdrop-blur-sm border-l border-border/50 w-full">
+      {/* Collapse/Expand Button */}
+      <div className="absolute top-4 -left-3 z-20">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setSidebarCollapsed(!isSidebarCollapsed)}
+          className="h-8 w-6 p-0 bg-card border border-border/50 shadow-sm hover:shadow-md"
+        >
+          {isSidebarCollapsed ? 
+            <ChevronLeft className="w-3 h-3" /> : 
+            <ChevronRight className="w-3 h-3" />
+          }
+        </Button>
+      </div>
+
       {/* Header */}
       <div className="panel-header">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
             <BarChart className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <h2 className="font-semibold text-foreground">Insights</h2>
-            <p className="text-xs text-muted-foreground">Performance Analytics</p>
-          </div>
+          {!isSidebarCollapsed && (
+            <div>
+              <h2 className="font-semibold text-foreground">Insights</h2>
+              <p className="text-xs text-muted-foreground">Performance Analytics</p>
+            </div>
+          )}
         </div>
-        {currentPlan && (
+        {!isSidebarCollapsed && currentPlan && (
           <Badge variant="info" className="text-xs">
             Plan {currentPlan.id}
           </Badge>
@@ -192,7 +214,8 @@ const InsightsPanel: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="panel-content p-4 space-y-6">
+      {!isSidebarCollapsed && (
+        <div className="panel-content p-4 space-y-6">
         {/* KPI Cards */}
         {kpiData && (
           <motion.div
@@ -275,6 +298,7 @@ const InsightsPanel: React.FC = () => {
                       angle={90} 
                       domain={[0, 100]} 
                       tick={{ fontSize: 10 }}
+                      tickCount={6}
                     />
                     <Radar 
                       name="Score" 
@@ -317,16 +341,21 @@ const InsightsPanel: React.FC = () => {
                   </BarChart>
                 </ResponsiveContainer>
                 <div className="flex justify-center mt-3 space-x-2">
-                  {planComparison.map((plan, index) => (
-                    <Button
-                      key={plan.name}
-                      variant={index === 0 ? "default" : "outline"}
-                      size="sm"
-                      className="text-xs"
-                    >
-                      {plan.name}
-                    </Button>
-                  ))}
+                  {planComparison.map((plan, index) => {
+                    const planId = optimizationResult?.plans[index]?.id;
+                    const isSelected = currentPlan?.id === planId;
+                    return (
+                      <Button
+                        key={plan.name}
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs"
+                        onClick={() => planId && selectPlan(planId)}
+                      >
+                        {plan.name}
+                      </Button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -451,7 +480,8 @@ const InsightsPanel: React.FC = () => {
             </p>
           </motion.div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

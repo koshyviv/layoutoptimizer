@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Bot, User, Sparkles, ChevronRight } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -156,9 +157,15 @@ const ChatPanel: React.FC = () => {
                       ? 'bg-primary text-primary-foreground rounded-br-md'
                       : 'bg-muted text-muted-foreground rounded-bl-md'
                   )}>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                      {message.content}
-                    </p>
+                    {message.role === 'assistant' ? (
+                      <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit prose-code:text-inherit prose-pre:bg-muted/50 prose-pre:text-inherit">
+                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {message.content}
+                      </p>
+                    )}
                     {message.type !== 'text' && (
                       <Badge variant="outline" className="mt-2 text-xs">
                         <Sparkles className="w-3 h-3 mr-1" />

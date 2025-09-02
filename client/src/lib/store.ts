@@ -46,6 +46,7 @@ interface AppStore extends AppState {
   
   // UI actions
   setLoading: (loading: boolean) => void
+  setSidebarCollapsed: (collapsed: boolean) => void
   setError: (error: string | undefined) => void
 }
 
@@ -68,6 +69,7 @@ export const useAppStore = create<AppStore>()(
         isDragging: false,
         showGrid: true,
         showMeasurements: false,
+        showConstraints: true,
         snapToGrid: true,
         gridSize: 2, // 2 meter grid
       },
@@ -79,6 +81,7 @@ export const useAppStore = create<AppStore>()(
         type: 'text'
       }],
       isLoading: false,
+      isSidebarCollapsed: true, // Collapsed by default
 
       // Chat actions
       addMessage: (message) =>
@@ -226,6 +229,11 @@ export const useAppStore = create<AppStore>()(
       setLoading: (loading) =>
         set((state) => {
           state.isLoading = loading
+        }),
+
+      setSidebarCollapsed: (collapsed) =>
+        set((state) => {
+          state.isSidebarCollapsed = collapsed
         }),
 
       setError: (error) =>

@@ -131,6 +131,7 @@ export interface CanvasState {
   isDragging: boolean
   showGrid: boolean
   showMeasurements: boolean
+  showConstraints: boolean
   snapToGrid: boolean
   gridSize: number
 }
@@ -143,6 +144,7 @@ export interface AppState {
   canvasState: CanvasState
   chatMessages: ChatMessage[]
   isLoading: boolean
+  isSidebarCollapsed: boolean
   error?: string
 }
 

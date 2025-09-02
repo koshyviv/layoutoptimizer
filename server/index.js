@@ -3,6 +3,8 @@ import cors from 'cors';
 import fs from 'fs';
 import yaml from 'yaml';
 import OpenAI from 'openai';
+import { z } from 'zod';
+import { zodResponseFormat } from 'openai/helpers/zod';
 
 // Initialise the Express application
 const app = express();
@@ -29,6 +31,83 @@ try {
 }
 
 // -------------------------------
+// Zod Schemas for Structured Outputs
+// -------------------------------
+
+// Schema for block objects in plans
+const BlockSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+  meta: z.object({
+    kpis: z.record(z.any())
+  }).optional()
+});
+
+// Schema for plan scores
+const ScoresSchema = z.object({
+  travel: z.number().min(0).max(1),
+  adj: z.number().min(0).max(1),
+  safety: z.number().min(0).max(1),
+  compact: z.number().min(0).max(1)
+});
+
+// Schema for plan objects
+const PlanSchema = z.object({
+  id: z.string(),
+  blocks: z.array(BlockSchema),
+  walkways: z.array(z.any()),
+  score: z.number().min(0).max(1),
+  scores: ScoresSchema,
+  ruleFindings: z.array(z.any())
+});
+
+// Schema for validation findings
+const FindingSchema = z.object({
+  id: z.string(),
+  type: z.enum(['info', 'warning', 'error']),
+  message: z.string(),
+  suggestion: z.string()
+});
+
+// Schema for chat response - the main structured output for OpenAI
+const ChatResponseSchema = z.object({
+  message: z.string().describe('The main response message to show to the user'),
+  action: z.enum(['synthesize', 'optimize', 'validate', 'gather_requirements', 'suggest_modules']).nullable().describe('The next action to take, if any'),
+  data: z.any().nullable().describe('Any additional data related to the action'),
+  reasoning: z.string().optional().describe('Brief explanation of the reasoning behind the response')
+});
+
+// Schema for area estimations
+const AreasSchema = z.object({
+  pallet_asrs: z.number().min(0),
+  tote_asrs: z.number().min(0),
+  gtp: z.number().min(0),
+  picking: z.number().min(0),
+  consolidation: z.number().min(0)
+});
+
+// Schema for synthesis response
+const SynthesisResponseSchema = z.object({
+  plan: PlanSchema,
+  areas: AreasSchema,
+  adjacencies: z.array(z.any())
+});
+
+// Schema for optimization response
+const OptimizationResponseSchema = z.object({
+  plans: z.array(PlanSchema)
+});
+
+// Schema for validation response
+const ValidationResponseSchema = z.object({
+  findings: z.array(FindingSchema)
+});
+
+// -------------------------------
 // Helper: simple tool functions
 // -------------------------------
 // Unit helpers
@@ -41,6 +120,7 @@ function coalesceNumber(value, fallback) {
 
 // Estimate areas from throughput using YAML coefficients
 function estimateAreasTool({ request }) {
+  console.log('🔧 estimateAreasTool called with request:', JSON.stringify(request, null, 2));
   const coeff = rules?.area_coefficients || {};
   const t = request?.t || {};
   const areas = {
@@ -50,14 +130,18 @@ function estimateAreasTool({ request }) {
     picking: coalesceNumber(t.ordersPerH, 0) * coalesceNumber(coeff.picking, 0.1),
     consolidation: coalesceNumber(t.ordersPerH, 0) * coalesceNumber(coeff.consolidation, 0.08),
   };
+  console.log('📊 Estimated areas:', areas);
   return { areas };
 }
 
 // Generate an initial macro plan (very simple shelf-line packing along a main aisle)
 function generateInitialPlanTool({ request }) {
+  console.log('🏗️  generateInitialPlanTool called with request:', JSON.stringify(request, null, 2));
   const site = request?.site || { widthM: 96, heightM: 54 };
   const modules = request?.modules || {};
   const forkliftClass = request?.site?.forklift || 'WA';
+  console.log('📐 Site dimensions:', site, 'Forklift class:', forkliftClass);
+  console.log('🏭 Active modules:', Object.keys(modules).filter(k => modules[k]));
 
   const aisleFeet = rules?.forklift_aisles?.[forkliftClass] || 13.0;
   const aisleWidthM = aisleFeet * FEET_TO_METERS;
@@ -119,15 +203,20 @@ function generateInitialPlanTool({ request }) {
   const scores = { travel: 0.8, adj: 0.75, safety: 0.9, compact: 0.78 };
   const score = (scores.travel + scores.adj + scores.safety + scores.compact) / 4;
 
+  const plan = {
+    id: `plan-${Date.now()}`,
+    blocks,
+    walkways: [],
+    score,
+    scores,
+    ruleFindings: []
+  };
+
+  console.log('✅ Generated plan with', blocks.length, 'blocks, score:', score.toFixed(3));
+  console.log('📦 Blocks summary:', blocks.map(b => `${b.key}(${b.w}×${b.h})`).join(', '));
+
   return {
-    plan: {
-      id: `plan-${Date.now()}`,
-      blocks,
-      walkways: [],
-      score,
-      scores,
-      ruleFindings: []
-    },
+    plan,
     areas: estimateAreasTool({ request }).areas,
     adjacencies: []
   };
@@ -135,6 +224,7 @@ function generateInitialPlanTool({ request }) {
 
 // Produce three simple variants by shifting blocks slightly and re-scoring
 function optimizePlanTool({ plan, weights }) {
+  console.log('⚡ optimizePlanTool called for plan:', plan?.id, 'with weights:', weights);
   const makeVariant = (basePlan, label, offset) => {
     const blocks = basePlan.blocks.map(b =>
       b.key === 'aisle' ? b : { ...b, x: Math.max(0, b.x + offset), y: Math.max(0, b.y + (offset % 3)) }
@@ -169,11 +259,13 @@ function optimizePlanTool({ plan, weights }) {
     variants.sort((a, b) => b.score - a.score);
   }
 
+  console.log('🔄 Generated', variants.length, 'optimized variants with scores:', variants.map(v => v.score.toFixed(3)).join(', '));
   return { plans: variants };
 }
 
 // Validate plan using simplified rule checks from YAML
 function validatePlanTool({ plan }) {
+  console.log('🔍 validatePlanTool called for plan:', plan?.id);
   const findings = [];
   const forklift = (plan?.meta?.forklift || 'WA');
   const reqAisleFeet = rules?.forklift_aisles?.[forklift] || 13.0;
@@ -198,11 +290,13 @@ function validatePlanTool({ plan }) {
     suggestion: `${rules?.fire_safety?.flue_space_transverse || 6}" transverse, ${rules?.fire_safety?.flue_space_longitudinal || 3}" longitudinal`
   });
 
+  console.log('📋 Validation found', findings.length, 'findings:', findings.map(f => f.type).join(', '));
   return { findings };
 }
 
 // Explain tradeoffs between two plans (simple diff)
 function explainTradeoffsTool({ planA, planB }) {
+  console.log('🔄 explainTradeoffsTool called for plans:', planA?.id, 'vs', planB?.id);
   const toScore = p => p?.scores || {};
   const a = toScore(planA);
   const b = toScore(planB);
@@ -213,6 +307,7 @@ function explainTradeoffsTool({ planA, planB }) {
       bullets.push(`${k}: ${better} (${(a[k]||0).toFixed(2)} vs ${(b[k]||0).toFixed(2)})`);
     }
   });
+  console.log('📊 Trade-off analysis:', bullets.join('; '));
   return { bullets };
 }
 
@@ -303,8 +398,10 @@ const toolDefinitions = [
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, context } = req.body || {};
+    console.log('💬 /api/chat called with message:', message?.substring(0, 100) + '...');
 
     if (!message) {
+      console.log('❌ Chat request missing message');
       return res.status(400).json({ error: 'Message is required' });
     }
 
@@ -323,24 +420,30 @@ When you have sufficient info to act, call one of the tools. After tool results,
       { role: 'user', content: message }
     ];
 
-    // Loop to satisfy tool calls until the assistant returns a final answer
+    console.log('📝 Chat context includes', mappedHistory.length, 'previous messages');
+
+    // First, handle tool calls with regular completion
     let assistantMsg;
     let safetyCounter = 0;
     let workingMessages = [...messages];
+    
     do {
+      console.log('🤖 Calling OpenAI with', workingMessages.length, 'messages');
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o-2024-08-06',
         messages: workingMessages,
         tools: toolDefinitions,
         temperature: 0.2,
         max_tokens: 800
       });
+      
       assistantMsg = completion.choices[0]?.message;
       if (!assistantMsg) break;
 
       workingMessages.push(assistantMsg);
 
       const toolCalls = assistantMsg.tool_calls || [];
+      console.log('🔧 Assistant requested', toolCalls.length, 'tool calls:', toolCalls.map(tc => tc.function?.name).join(', '));
       if (toolCalls.length === 0) break;
 
       for (const tc of toolCalls) {
@@ -353,6 +456,7 @@ When you have sufficient info to act, call one of the tools. After tool results,
           try {
             result = await impl(args);
           } catch (e) {
+            console.log('❌ Tool error in', name, ':', e?.message || e);
             result = { error: String(e?.message || e) };
           }
         }
@@ -362,6 +466,27 @@ When you have sufficient info to act, call one of the tools. After tool results,
       safetyCounter += 1;
     } while (safetyCounter < 5);
 
+    // Now get the final structured response
+    console.log('🎯 Getting final structured response');
+    try {
+      const structuredCompletion = await openai.beta.chat.completions.parse({
+        model: 'gpt-4o-2024-08-06',
+        messages: workingMessages,
+        response_format: zodResponseFormat(ChatResponseSchema, "chat_response"),
+        temperature: 0.2,
+        max_tokens: 800
+      });
+
+      const structuredResponse = structuredCompletion.choices[0]?.message?.parsed;
+      if (structuredResponse) {
+        console.log('✅ Using structured output:', { action: structuredResponse.action, messageLength: structuredResponse.message?.length || 0 });
+        return res.json(structuredResponse);
+      }
+    } catch (structuredError) {
+      console.log('⚠️ Structured output failed, falling back to regular parsing:', structuredError.message);
+    }
+
+    // Fallback to parsing content if structured output is not available
     let out = { message: '', action: null, data: null };
     const content = assistantMsg?.content || '';
     try {
@@ -370,6 +495,7 @@ When you have sufficient info to act, call one of the tools. After tool results,
     } catch {
       out = { message: content, action: null, data: null };
     }
+    console.log('✅ Using fallback parsing:', { action: out.action, messageLength: out.message?.length || 0 });
 
     return res.json(out);
   } catch (error) {
@@ -383,32 +509,65 @@ When you have sufficient info to act, call one of the tools. After tool results,
 
 // Synthesis endpoint with enhanced demo data
 app.post('/api/layout/synthesize', (req, res) => {
+  console.log('🏗️  /api/layout/synthesize called');
   try {
     const result = generateInitialPlanTool({ request: req.body || {} });
-    return res.json(result);
+    
+    // Validate the result against our schema
+    const validatedResult = SynthesisResponseSchema.parse(result);
+    
+    console.log('✅ Synthesis complete, returning plan with', validatedResult?.plan?.blocks?.length || 0, 'blocks');
+    return res.json(validatedResult);
   } catch (e) {
+    if (e.name === 'ZodError') {
+      console.log('❌ Synthesis validation error:', e.errors);
+      return res.status(500).json({ error: 'Invalid synthesis response format', details: e.errors });
+    }
+    console.log('❌ Synthesis error:', e?.message || e);
     return res.status(400).json({ error: 'Failed to synthesize plan', message: String(e?.message || e) });
   }
 });
 
 // Optimization endpoint with multiple plan variants
 app.post('/api/layout/optimize', (req, res) => {
+  console.log('⚡ /api/layout/optimize called');
   try {
     const { plan, weights } = req.body || {};
     const result = optimizePlanTool({ plan, weights });
-    return res.json(result);
+    
+    // Validate the result against our schema
+    const validatedResult = OptimizationResponseSchema.parse(result);
+    
+    console.log('✅ Optimization complete, returning', validatedResult?.plans?.length || 0, 'variants');
+    return res.json(validatedResult);
   } catch (e) {
+    if (e.name === 'ZodError') {
+      console.log('❌ Optimization validation error:', e.errors);
+      return res.status(500).json({ error: 'Invalid optimization response format', details: e.errors });
+    }
+    console.log('❌ Optimization error:', e?.message || e);
     return res.status(400).json({ error: 'Failed to optimize plan', message: String(e?.message || e) });
   }
 });
 
 // Validation endpoint with realistic rule findings
 app.post('/api/layout/validate', (req, res) => {
+  console.log('🔍 /api/layout/validate called');
   try {
     const { plan } = req.body || {};
     const result = validatePlanTool({ plan });
-    return res.json(result);
+    
+    // Validate the result against our schema
+    const validatedResult = ValidationResponseSchema.parse(result);
+    
+    console.log('✅ Validation complete, found', validatedResult?.findings?.length || 0, 'findings');
+    return res.json(validatedResult);
   } catch (e) {
+    if (e.name === 'ZodError') {
+      console.log('❌ Validation schema error:', e.errors);
+      return res.status(500).json({ error: 'Invalid validation response format', details: e.errors });
+    }
+    console.log('❌ Validation error:', e?.message || e);
     return res.status(400).json({ error: 'Failed to validate plan', message: String(e?.message || e) });
   }
 });
@@ -416,6 +575,7 @@ app.post('/api/layout/validate', (req, res) => {
 // Export endpoint.  Would normally build CSV/JSON/SVG/DXF/USD outputs
 // based off the selected plan.  Responds with a stub message for now.
 app.post('/api/export', (req, res) => {
+  console.log('📤 /api/export called');
   res.json({ status: 'Export functionality not implemented yet.' });
 });
 
@@ -423,6 +583,7 @@ app.post('/api/export', (req, res) => {
 // debugging.  This allows the front‑end to fetch constraints and
 // surface them in the UI.
 app.get('/api/rules', (req, res) => {
+  console.log('📋 /api/rules called');
   res.json(rules);
 });
 
