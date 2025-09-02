@@ -30,7 +30,9 @@ const CanvasPanel: React.FC = () => {
     updateCanvasState,
     updateBlock,
     setSelectedBlocks,
-    clearSelection
+    clearSelection,
+    isSidebarCollapsed,
+    isChatSidebarCollapsed
   } = useAppStore();
 
   const stageRef = useRef<Konva.Stage>(null);
@@ -40,20 +42,30 @@ const CanvasPanel: React.FC = () => {
   const [animationTime, setAnimationTime] = useState(0);
   const [violations, setViolations] = useState<Record<string, string | undefined>>({});
 
-  // Update stage size on window resize
+  // Update stage size on window resize and sidebar changes
   useEffect(() => {
     const updateSize = () => {
       const container = stageRef.current?.container();
       if (container) {
-        const { offsetWidth, offsetHeight } = container.parentElement!;
+        const parent = container.parentElement!;
+        const { offsetWidth, offsetHeight } = parent;
+        console.log('Canvas size update:', { offsetWidth, offsetHeight });
         setStageSize({ width: offsetWidth, height: offsetHeight });
       }
     };
 
+    // Immediate update
     updateSize();
+    
+    // Also update after animations complete (300ms + buffer)
+    const timeoutId = setTimeout(updateSize, 350);
+    
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', updateSize);
+    };
+  }, [isSidebarCollapsed, isChatSidebarCollapsed]);
 
   // Animation loop for warehouse activity
   useEffect(() => {

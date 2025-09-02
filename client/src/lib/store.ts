@@ -47,6 +47,7 @@ interface AppStore extends AppState {
   // UI actions
   setLoading: (loading: boolean) => void
   setSidebarCollapsed: (collapsed: boolean) => void
+  setChatSidebarCollapsed: (collapsed: boolean) => void
   setError: (error: string | undefined) => void
 }
 
@@ -81,7 +82,8 @@ export const useAppStore = create<AppStore>()(
         type: 'text'
       }],
       isLoading: false,
-      isSidebarCollapsed: true, // Collapsed by default
+      isSidebarCollapsed: true, // Right sidebar collapsed by default
+      isChatSidebarCollapsed: false, // Left sidebar expanded by default
 
       // Chat actions
       addMessage: (message) =>
@@ -234,6 +236,11 @@ export const useAppStore = create<AppStore>()(
       setSidebarCollapsed: (collapsed) =>
         set((state) => {
           state.isSidebarCollapsed = collapsed
+        }),
+
+      setChatSidebarCollapsed: (collapsed) =>
+        set((state) => {
+          state.isChatSidebarCollapsed = collapsed
         }),
 
       setError: (error) =>

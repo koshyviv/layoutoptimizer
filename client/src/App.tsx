@@ -8,7 +8,7 @@ import { useAppStore } from '@/lib/store';
 
 // Main application component with modern three-panel layout inspired by YC companies
 const App: React.FC = () => {
-  const { isLoading, isSidebarCollapsed } = useAppStore();
+  const { isLoading, isSidebarCollapsed, isChatSidebarCollapsed } = useAppStore();
 
   return (
     <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col overflow-hidden">
@@ -17,12 +17,17 @@ const App: React.FC = () => {
       
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Chat Panel - Left (28% as per requirements) */}
+        {/* Chat Panel - Left (28% as per requirements, collapsible) */}
         <motion.div 
           initial={{ x: -300, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="w-[28%] panel border-r border-border/50 bg-card/95 backdrop-blur-sm"
+          animate={{ 
+            x: 0, 
+            opacity: 1
+          }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className={`panel border-r border-border/50 bg-card/95 backdrop-blur-sm overflow-hidden transition-all duration-300 ease-in-out ${
+            isChatSidebarCollapsed ? 'w-[60px] min-w-[60px] max-w-[60px]' : 'w-[28%] min-w-[300px]'
+          }`}
         >
           <ChatPanel />
         </motion.div>
@@ -32,7 +37,8 @@ const App: React.FC = () => {
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-          className="flex-1 relative bg-background overflow-hidden"
+          className="flex-1 relative bg-background overflow-hidden min-w-0"
+          style={{ flexGrow: 1, flexShrink: 1, flexBasis: '0%' }}
         >
           <CanvasPanel />
           
@@ -59,11 +65,12 @@ const App: React.FC = () => {
           initial={{ x: 300, opacity: 0 }}
           animate={{ 
             x: 0, 
-            opacity: 1,
-            width: isSidebarCollapsed ? '60px' : '24%'
+            opacity: 1
           }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="panel overflow-hidden"
+          className={`panel overflow-hidden transition-all duration-300 ease-in-out ${
+            isSidebarCollapsed ? 'w-[60px] min-w-[60px] max-w-[60px]' : 'w-[24%] min-w-[280px]'
+          }`}
         >
           <InsightsPanel />
         </motion.div>

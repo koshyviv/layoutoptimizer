@@ -144,7 +144,8 @@ export interface AppState {
   canvasState: CanvasState
   chatMessages: ChatMessage[]
   isLoading: boolean
-  isSidebarCollapsed: boolean
+  isSidebarCollapsed: boolean // Right sidebar (insights)
+  isChatSidebarCollapsed: boolean // Left sidebar (chat)
   error?: string
 }
 

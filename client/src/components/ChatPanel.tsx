@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Bot, User, Sparkles, ChevronRight } from 'lucide-react';
+import { Send, Bot, User, Sparkles, ChevronRight, ChevronLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,9 @@ const ChatPanel: React.FC = () => {
     chatMessages, 
     addMessage, 
     setLoading, 
-    isLoading 
+    isLoading,
+    isChatSidebarCollapsed,
+    setChatSidebarCollapsed
   } = useAppStore();
   
   const [input, setInput] = useState('');
@@ -98,26 +100,45 @@ const ChatPanel: React.FC = () => {
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Collapse/Expand Button */}
+      <div className="absolute top-4 -right-3 z-20">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setChatSidebarCollapsed(!isChatSidebarCollapsed)}
+          className="h-8 w-6 p-0 bg-card border border-border/50 shadow-sm hover:shadow-md"
+        >
+          {isChatSidebarCollapsed ? 
+            <ChevronRight className="w-3 h-3" /> : 
+            <ChevronLeft className="w-3 h-3" />
+          }
+        </Button>
+      </div>
       {/* Header */}
       <div className="panel-header">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-gradient-warehouse rounded-lg flex items-center justify-center">
             <Bot className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <h2 className="font-semibold text-foreground">AI Assistant</h2>
-            <p className="text-xs text-muted-foreground">Warehouse Layout Expert</p>
-          </div>
+          {!isChatSidebarCollapsed && (
+            <div>
+              <h2 className="font-semibold text-foreground">AI Assistant</h2>
+              <p className="text-xs text-muted-foreground">Warehouse Layout Expert</p>
+            </div>
+          )}
         </div>
-        <Badge variant="success" className="text-xs">
-          <div className="w-2 h-2 bg-success-500 rounded-full mr-2" />
-          Online
-        </Badge>
+        {!isChatSidebarCollapsed && (
+          <Badge variant="success" className="text-xs">
+            <div className="w-2 h-2 bg-success-500 rounded-full mr-2" />
+            Online
+          </Badge>
+        )}
       </div>
 
       {/* Messages */}
-      <div className="panel-content px-4 py-4">
+      {!isChatSidebarCollapsed && (
+        <div className="panel-content px-4 py-4">
         <div className="space-y-4">
           <AnimatePresence>
             {chatMessages.map((message, index) => (
@@ -231,34 +252,37 @@ const ChatPanel: React.FC = () => {
           </motion.div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
+          <div ref={messagesEndRef} />
+        </div>
+      )}
 
       {/* Input */}
-      <div className="p-4 border-t border-border/50">
-        <div className="flex space-x-2">
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Describe your warehouse requirements..."
-            className="flex-1 resize-none"
-            disabled={isLoading}
-          />
-          <Button
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            size="sm"
-            className="px-3"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+      {!isChatSidebarCollapsed && (
+        <div className="p-4 border-t border-border/50">
+          <div className="flex space-x-2">
+            <Input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Describe your warehouse requirements..."
+              className="flex-1 resize-none"
+              disabled={isLoading}
+            />
+            <Button
+              onClick={sendMessage}
+              disabled={!input.trim() || isLoading}
+              size="sm"
+              className="px-3"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Press Enter to send • Shift+Enter for new line
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send • Shift+Enter for new line
-        </p>
-      </div>
+      )}
     </div>
   );
 };
