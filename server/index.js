@@ -107,6 +107,19 @@ const ValidationResponseSchema = z.object({
   findings: z.array(FindingSchema)
 });
 
+// Schema for AI placement suggestion (Structured Output)
+const PlacementSchema = z.object({
+  id: z.string(),
+  x: z.number(),
+  y: z.number(),
+  rot: z.enum([0, 90, 180, 270])
+});
+const AIPlacementsSchema = z.object({
+  placements: z.array(PlacementSchema),
+  rationale: z.string().optional(),
+  kpi_guess: z.object({ mhc: z.number().optional(), throughput: z.number().optional() }).optional()
+});
+
 // -------------------------------
 // Helper: simple tool functions
 // -------------------------------
@@ -577,6 +590,61 @@ app.post('/api/layout/validate', (req, res) => {
 app.post('/api/export', (req, res) => {
   console.log('📤 /api/export called');
   res.json({ status: 'Export functionality not implemented yet.' });
+});
+
+// AI placements endpoint - uses Structured Outputs
+app.post('/api/ai/placements', async (req, res) => {
+  console.log('🤖 /api/ai/placements called');
+  try {
+    const { components, flows, path_mask_bbox, grid, constraints, optimization_summary, request_type } = req.body || {};
+
+    // Handle optimization summary requests
+    if (request_type === 'summary' && optimization_summary) {
+      const system = `You are a warehouse optimization expert. Generate a natural, engaging summary of optimization results. Focus on the business impact and specific improvements. Be conversational but professional. Include specific percentages and strategies used.`;
+      
+      const userPrompt = `The optimization improved the warehouse layout from ${(optimization_summary.original_score * 100).toFixed(1)}% to ${(optimization_summary.optimized_score * 100).toFixed(1)}% efficiency. Travel improved by ${optimization_summary.improvements.travel}%, adjacency by ${optimization_summary.improvements.adjacency}%, and safety by ${optimization_summary.improvements.safety}%. Explain what this means and what strategies were likely used in 2-3 paragraphs.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-2024-08-06',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 400
+      });
+
+      const summary = completion.choices[0]?.message?.content || 'Optimization completed successfully with improved efficiency.';
+      return res.json({ rationale: `✅ **Optimization Complete!**\n\n${summary}\n\n*Select different variants in the Insights panel to compare alternatives.*` });
+    }
+
+    // Handle placement requests
+    const system = `You return ONLY JSON per the schema. Given components with sizes (meters), a path mask bbox, aisle min, and flow matrix, propose legal placements on grid ${grid||0.25} m minimizing MHC and keeping adjacency pairs close. Ensure all components are within bounds and do not overlap path or violate aisle clearance. Rotations allowed: 0,90,180,270.`;
+
+    const messages = [
+      { role: 'system', content: system },
+      { role: 'user', content: JSON.stringify({ components, flows, path_mask_bbox, constraints }) }
+    ];
+
+    const completion = await openai.beta.chat.completions.parse({
+      model: 'gpt-4o-2024-08-06',
+      messages,
+      response_format: zodResponseFormat(AIPlacementsSchema, 'placements_response'),
+      temperature: 0.2,
+      max_tokens: 600
+    });
+
+    const parsed = completion.choices[0]?.message?.parsed;
+    if (!parsed) {
+      return res.status(500).json({ error: 'No placements returned' });
+    }
+
+    // Return as-is; client will re-score and validate
+    return res.json(parsed);
+  } catch (e) {
+    console.error('AI placements error', e?.message || e);
+    return res.status(500).json({ error: 'Failed to generate placements', message: String(e?.message || e) });
+  }
 });
 
 // Rules endpoint returns the loaded rule set for transparency and

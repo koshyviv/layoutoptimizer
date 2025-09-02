@@ -7,189 +7,138 @@ export const createDemoPlan = (): Plan => {
 };
 
 export const createDemoPlanVariant = (variant: 'A' | 'B' | 'C'): Plan => {
-  // Base offsets for different variants
+  // Create a deliberately suboptimal starting layout for dramatic optimization gains
+  if (variant === 'A') {
+    return createSuboptimalStartingLayout();
+  }
+  
+  // Base offsets for optimized variants
   const variantOffsets = {
-    A: { x: 0, y: 0 },
-    B: { x: 2, y: 1 },
-    C: { x: -1, y: 2 }
+    B: { x: 0, y: 0 },
+    C: { x: 1, y: -1 }
   };
   
   const offset = variantOffsets[variant];
   
+  // OPTIMIZED LAYOUTS - SPINE-AWARE POSITIONING (spine at y=30, height=6)
   const blocks: Block[] = [
     {
       id: generateId(),
       key: 'inbound',
       x: 4 + offset.x,
-      y: 6 + offset.y,
-      w: 24,
-      h: 12,
+      y: 5 + offset.y, // ABOVE spine
+      w: 20,
+      h: 10,
       meta: {
         kpis: {
-          throughput: 75,
-          utilization: 0.85
+          throughput: 85,
+          utilization: 0.92
         },
-        notes: ['Receiving dock area', '6 dock doors']
+        notes: ['Receiving dock area', '4 dock doors']
       }
     },
     {
       id: generateId(),
       key: 'depalletizer',
-      x: 30 + offset.x,
-      y: 8 + offset.y,
-      w: 12,
+      x: 28 + offset.x,
+      y: 5 + offset.y, // ABOVE spine, adjacent to inbound
+      w: 10,
       h: 8,
       meta: {
         kpis: {
-          throughput: 75,
-          efficiency: 0.92
+          throughput: 85,
+          efficiency: 0.96
         }
       }
     },
     {
       id: generateId(),
       key: 'pallet_asrs',
-      x: 4 + offset.x,
-      y: 22 + offset.y,
-      w: 32,
-      h: 18,
+      x: 42 + offset.x,
+      y: 5 + offset.y, // ABOVE spine, near depalletizer
+      w: 28,
+      h: 20,
       meta: {
         kpis: {
-          capacity: 15000,
-          utilization: 0.78,
-          throughput: 120
+          capacity: 12000,
+          utilization: 0.85,
+          throughput: 140
         },
-        notes: ['15K pallet positions', 'Automated crane system']
+        notes: ['12K pallet positions', 'Automated crane system']
       }
     },
     {
       id: generateId(),
       key: 'tote_asrs',
-      x: 40 + offset.x,
-      y: 22 + offset.y,
-      w: 24,
-      h: 12,
+      x: 74 + offset.x,
+      y: 5 + offset.y, // ABOVE spine
+      w: 20,
+      h: 20,
       meta: {
         kpis: {
-          capacity: 8000,
-          utilization: 0.82,
-          throughput: 200
+          capacity: 6000,
+          utilization: 0.88,
+          throughput: 220
         }
       }
     },
     {
       id: generateId(),
       key: 'gtp',
-      x: 68 + offset.x,
-      y: 18 + offset.y,
-      w: 18,
+      x: 74 + offset.x,
+      y: 40 + offset.y, // BELOW spine, near tote_asrs
+      w: 20,
       h: 12,
       meta: {
         kpis: {
-          stations: 8,
-          throughput: 180,
-          efficiency: 0.88
-        }
-      }
-    },
-    {
-      id: generateId(),
-      key: 'picking',
-      x: 38 + offset.x,
-      y: 44 + offset.y,
-      w: 26,
-      h: 16,
-      meta: {
-        kpis: {
-          zones: 12,
-          throughput: 150,
-          accuracy: 0.995
-        }
-      }
-    },
-    {
-      id: generateId(),
-      key: 'consolidation',
-      x: 68 + offset.x,
-      y: 44 + offset.y,
-      w: 20,
-      h: 14,
-      meta: {
-        kpis: {
           stations: 6,
-          throughput: 140
-        }
-      }
-    },
-    {
-      id: generateId(),
-      key: 'palletizer',
-      x: 92 + offset.x,
-      y: 48 + offset.y,
-      w: 12,
-      h: 8,
-      meta: {
-        kpis: {
-          throughput: 85,
+          throughput: 200,
           efficiency: 0.94
         }
       }
     },
     {
       id: generateId(),
-      key: 'outbound',
-      x: 92,
-      y: 6,
+      key: 'picking',
+      x: 30 + offset.x,
+      y: 40 + offset.y, // BELOW spine
       w: 24,
+      h: 14,
+      meta: {
+        kpis: {
+          zones: 10,
+          throughput: 170,
+          accuracy: 0.997
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'consolidation',
+      x: 58 + offset.x,
+      y: 40 + offset.y, // BELOW spine, near picking
+      w: 14,
       h: 12,
       meta: {
         kpis: {
-          throughput: 85,
-          docks: 8
-        },
-        notes: ['Shipping dock area', '8 dock doors']
-      }
-    },
-    {
-      id: generateId(),
-      key: 'charging',
-      x: 90,
-      y: 32,
-      w: 8,
-      h: 6,
-      meta: {
-        kpis: {
-          stations: 4,
-          capacity: 20
+          stations: 5,
+          throughput: 160
         }
       }
     },
     {
       id: generateId(),
-      key: 'qc',
-      x: 4,
-      y: 44,
-      w: 16,
+      key: 'outbound',
+      x: 4 + offset.x,
+      y: 40 + offset.y, // BELOW spine
+      w: 20,
       h: 10,
       meta: {
         kpis: {
-          stations: 3,
-          throughput: 50
-        }
-      }
-    },
-    {
-      id: generateId(),
-      key: 'maintenance',
-      x: 24,
-      y: 44,
-      w: 12,
-      h: 8,
-      meta: {
-        kpis: {
-          bays: 2,
-          utilization: 0.65
-        }
+          throughput: 95,
+          docks: 4
+        },
+        notes: ['Shipping dock area', '4 dock doors']
       }
     }
   ];
@@ -197,30 +146,32 @@ export const createDemoPlanVariant = (variant: 'A' | 'B' | 'C'): Plan => {
   // Variant-specific scores and findings
   const variantData = {
     A: {
-      score: 0.847,
-      scores: { travel: 0.82, adj: 0.89, safety: 0.91, compact: 0.78 },
+      score: 0.623,
+      scores: { travel: 0.58, adj: 0.64, safety: 0.72, compact: 0.56 },
       findings: [
-        'All OSHA safety clearances met',
-        'Forklift aisle widths comply with WA truck specifications',
-        'Consider 6" flue spaces for optimal fire safety'
+        'Suboptimal layout with poor adjacencies',
+        'High travel distances between related stations',
+        'Inefficient space utilization'
       ]
     },
     B: {
-      score: 0.863,
-      scores: { travel: 0.85, adj: 0.91, safety: 0.89, compact: 0.81 },
+      score: 0.891,
+      scores: { travel: 0.89, adj: 0.92, safety: 0.94, compact: 0.82 },
       findings: [
-        'Improved adjacency between GTP and picking areas',
-        'Slightly reduced travel distances',
-        'All safety requirements met'
+        'Optimized adjacency between inbound and depalletizer',
+        'Reduced travel distances by 34%',
+        'Improved material flow efficiency',
+        'Enhanced safety clearances'
       ]
     },
     C: {
-      score: 0.829,
-      scores: { travel: 0.79, adj: 0.87, safety: 0.93, compact: 0.75 },
+      score: 0.874,
+      scores: { travel: 0.86, adj: 0.88, safety: 0.96, compact: 0.84 },
       findings: [
-        'Enhanced safety clearances',
-        'More compact layout with better space utilization',
-        'Minor increase in travel distances'
+        'Alternative layout with compact footprint',
+        'Excellent safety compliance',
+        'Good adjacency optimization',
+        'Space-efficient design'
       ]
     }
   };
@@ -236,16 +187,150 @@ export const createDemoPlanVariant = (variant: 'A' | 'B' | 'C'): Plan => {
   };
 };
 
+// Create deliberately suboptimal starting layout - AVOIDING CENTRAL SPINE AT Y=30
+function createSuboptimalStartingLayout(): Plan {
+  const blocks: Block[] = [
+    {
+      id: generateId(),
+      key: 'inbound',
+      x: 5,
+      y: 5,
+      w: 18,
+      h: 8,
+      meta: {
+        kpis: {
+          throughput: 65,
+          utilization: 0.72
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'depalletizer',
+      x: 70, // Far from inbound - bad adjacency, ABOVE spine
+      y: 5,
+      w: 10,
+      h: 8,
+      meta: {
+        kpis: {
+          throughput: 65,
+          efficiency: 0.78
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'pallet_asrs',
+      x: 85, // Far from depalletizer, ABOVE spine
+      y: 15,
+      w: 20,
+      h: 12,
+      meta: {
+        kpis: {
+          capacity: 10000,
+          utilization: 0.68,
+          throughput: 95
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'tote_asrs',
+      x: 5, // Poor placement, BELOW spine
+      y: 40,
+      w: 18,
+      h: 10,
+      meta: {
+        kpis: {
+          capacity: 5000,
+          utilization: 0.75,
+          throughput: 180
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'gtp',
+      x: 85, // Far from tote_asrs, BELOW spine
+      y: 40,
+      w: 14,
+      h: 8,
+      meta: {
+        kpis: {
+          stations: 4,
+          throughput: 150,
+          efficiency: 0.82
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'picking',
+      x: 30,
+      y: 5, // ABOVE spine
+      w: 20,
+      h: 12,
+      meta: {
+        kpis: {
+          zones: 8,
+          throughput: 120,
+          accuracy: 0.992
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'consolidation',
+      x: 55,
+      y: 40, // BELOW spine
+      w: 16,
+      h: 10,
+      meta: {
+        kpis: {
+          stations: 4,
+          throughput: 110
+        }
+      }
+    },
+    {
+      id: generateId(),
+      key: 'outbound',
+      x: 30, // Poor position, BELOW spine
+      y: 55,
+      w: 18,
+      h: 8,
+      meta: {
+        kpis: {
+          throughput: 70,
+          docks: 3
+        }
+      }
+    }
+  ];
+
+  return {
+    id: 'demo-plan-a',
+    blocks,
+    score: 0.623,
+    scores: { travel: 0.58, adj: 0.64, safety: 0.72, compact: 0.56 },
+    ruleFindings: [
+      'Suboptimal layout with poor adjacencies',
+      'High travel distances between related stations',
+      'Inefficient space utilization'
+    ]
+  };
+}
+
 export const createDemoOptimizationResult = () => {
   const plans = [
-    createDemoPlanVariant('A'),
-    createDemoPlanVariant('B'), 
-    createDemoPlanVariant('C')
+    createDemoPlanVariant('B'), // Best optimized
+    createDemoPlanVariant('C'), // Alternative
+    createSuboptimalStartingLayout() // Show original for comparison
   ];
   
   return {
     plans,
-    selectedPlanId: 'demo-plan-a',
+    selectedPlanId: 'demo-plan-b',
     isOptimizing: false
   };
 };

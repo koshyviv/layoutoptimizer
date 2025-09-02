@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, Circle, Path } from 'react-konva';
 import { motion } from 'framer-motion';
 import { 
@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAppStore } from '@/lib/store';
 import { Block, MODULE_DEFINITIONS } from '@/lib/types';
 import { cn, snapToGrid } from '@/lib/utils';
+import { PathMask, GridIndex, checkPlacementLegality, nudgeToNearestLegal } from '@/lib/grid';
 import Konva from 'konva';
 
 // Interactive 2D canvas with warehouse layout editor
@@ -37,6 +38,7 @@ const CanvasPanel: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [animationTime, setAnimationTime] = useState(0);
+  const [violations, setViolations] = useState<Record<string, string | undefined>>({});
 
   // Update stage size on window resize
   useEffect(() => {
@@ -119,6 +121,23 @@ const CanvasPanel: React.FC = () => {
     const snappedY = canvasState.snapToGrid ? snapToGrid(meterY, canvasState.gridSize) : meterY;
     
     updateBlock(blockId, { x: snappedX, y: snappedY });
+
+    // Legality feedback while dragging
+    const moving = currentPlan?.blocks.find(b => b.id === blockId);
+    if (!currentPlan || !moving) return;
+    const others = currentPlan.blocks.filter(b => b.id !== blockId).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h }));
+    const siteBounds = currentPlan.blocks.reduce((acc, block) => ({
+      minX: Math.min(acc.minX, block.x),
+      minY: Math.min(acc.minY, block.y),
+      maxX: Math.max(acc.maxX, block.x + block.w),
+      maxY: Math.max(acc.maxY, block.y + block.h)
+    }), { minX: 0, minY: 0, maxX: 100, maxY: 60 });
+    const site = { x: siteBounds.minX - 5, y: siteBounds.minY - 5, w: (siteBounds.maxX - siteBounds.minX) + 10, h: (siteBounds.maxY - siteBounds.minY) + 10 };
+    const pathMask = buildPathMask(currentPlan);
+    const candidate = { x: snappedX, y: snappedY, w: moving.w, h: moving.h };
+    const minAisle = 3.0;
+    const res = checkPlacementLegality(candidate, others, pathMask, { minAisle, site });
+    setViolations(v => ({ ...v, [blockId]: res.ok ? undefined : res.reason }));
   };
 
   const handleBlockDragEnd = (blockId: string, e: any) => {
@@ -129,7 +148,34 @@ const CanvasPanel: React.FC = () => {
     const snappedX = canvasState.snapToGrid ? snapToGrid(meterX, canvasState.gridSize) : meterX;
     const snappedY = canvasState.snapToGrid ? snapToGrid(meterY, canvasState.gridSize) : meterY;
     
-    updateBlock(blockId, { x: snappedX, y: snappedY });
+    // Final legality enforcement; nudge to nearest legal cell if needed
+    if (currentPlan) {
+      const moving = currentPlan.blocks.find(b => b.id === blockId);
+      if (moving) {
+        const others = currentPlan.blocks.filter(b => b.id !== blockId).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h }));
+        const siteBounds = currentPlan.blocks.reduce((acc, block) => ({
+          minX: Math.min(acc.minX, block.x),
+          minY: Math.min(acc.minY, block.y),
+          maxX: Math.max(acc.maxX, block.x + block.w),
+          maxY: Math.max(acc.maxY, block.y + block.h)
+        }), { minX: 0, minY: 0, maxX: 100, maxY: 60 });
+        const site = { x: siteBounds.minX - 5, y: siteBounds.minY - 5, w: (siteBounds.maxX - siteBounds.minX) + 10, h: (siteBounds.maxY - siteBounds.minY) + 10 };
+        const pathMask = buildPathMask(currentPlan);
+        const minAisle = 3.0;
+        const candidate = { x: snappedX, y: snappedY, w: moving.w, h: moving.h };
+        const legal = checkPlacementLegality(candidate, others, pathMask, { minAisle, site });
+        if (!legal.ok) {
+          const nudged = nudgeToNearestLegal(candidate, others, pathMask, { minAisle, site }, 20);
+          updateBlock(blockId, { x: nudged.x, y: nudged.y });
+          setViolations(v => ({ ...v, [blockId]: undefined }));
+        } else {
+          updateBlock(blockId, { x: snappedX, y: snappedY });
+          setViolations(v => ({ ...v, [blockId]: undefined }));
+        }
+      }
+    } else {
+      updateBlock(blockId, { x: snappedX, y: snappedY });
+    }
     setIsDragging(false);
   };
 
@@ -271,7 +317,7 @@ const CanvasPanel: React.FC = () => {
     const pixelW = block.w * 20;
     const pixelH = block.h * 20;
 
-    const equipment = [];
+    const equipment = [] as any[];
 
     // Base floor area with realistic warehouse flooring
     equipment.push(
@@ -813,6 +859,30 @@ const CanvasPanel: React.FC = () => {
       );
     }
 
+    // Violation overlay
+    if (violations[block.id]) {
+      equipment.push(
+        <Group key="violation">
+          <Rect
+            width={pixelW}
+            height={pixelH}
+            fill="rgba(220,38,38,0.06)"
+            stroke="#dc2626"
+            strokeWidth={3}
+            dash={[6, 6]}
+          />
+          <Text
+            x={0}
+            y={-14}
+            text={violations[block.id] || ''}
+            fontSize={10}
+            fontFamily="Inter, sans-serif"
+            fill="#dc2626"
+          />
+        </Group>
+      );
+    }
+
     return (
       <Group
         key={block.id}
@@ -890,6 +960,24 @@ const CanvasPanel: React.FC = () => {
     }
 
     return floorElements;
+  };
+
+  // Build a path mask from aisle blocks to prevent placement overlaps
+  const buildPathMask = (plan?: { blocks: Block[] }) => {
+    if (!plan) return new PathMask({ cellSize: 0.25, width: 200, height: 120 });
+    const bounds = plan.blocks.reduce((acc, block) => ({
+      minX: Math.min(acc.minX, block.x),
+      minY: Math.min(acc.minY, block.y),
+      maxX: Math.max(acc.maxX, block.x + block.w),
+      maxY: Math.max(acc.maxY, block.y + block.h)
+    }), { minX: 0, minY: 0, maxX: 100, maxY: 60 });
+    const mask = new PathMask({ cellSize: 0.25, width: (bounds.maxX - bounds.minX) + 20, height: (bounds.maxY - bounds.minY) + 20 });
+    for (const b of plan.blocks) {
+      if (b.key === 'aisle') {
+        mask.fillRect({ x: b.x, y: b.y, w: b.w, h: b.h }, 1);
+      }
+    }
+    return mask;
   };
 
   const renderCentralSpine = () => {
